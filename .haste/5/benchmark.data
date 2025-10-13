@@ -1,0 +1,20 @@
+#!/Users/pd/.local/bin/rebench --no-denoise -df benchmark.data rebench.conf
+# Execution Start: 2025-10-13T15:53:41.751781+00:00
+# Environment: {"userName":"pd","manualRun":true,"hostName":"cogna-mac.local","osType":"Darwin","memory":38654705664,"denoise":{},"cpu":"Apple M3 Pro","clockSpeed":0,"software":[{"name":"kernel","version":"Darwin Kernel Version 24.6.0: Mon Jul 14 11:28:30 PDT 2025; root:xnu-11417.140.69~1/RELEASE_ARM64_T6030"},{"name":"kernel-release","version":"24.6.0"},{"name":"architecture","version":"arm64"}]}
+# Source: {"repoURL":"git@github.com:ykjit/haste.git","branchOrTag":"main","commitId":"be1e0919d13f0fe92c4bcf43d1e78d893494df62","commitMsg":"Merge pull request #3 from ykjit/add-check-for-rebench-binary\n\nAdd check for `rebench` binary  before execution.\n","authorName":"Laurence Tratt","committerName":"GitHub","authorEmail":"laurie@tratt.net","committerEmail":"noreply@github.com"}
+invocation	iteration	value	unit	criterion	benchmark	executor	suite	extraArgs	cores	inputSize	varValue	tag	machine	runId
+# benchmark: 0={"name":"30","command":"30","runDetails":{"invocations":1,"iterations":1,"minIterationTime":1,"maxInvocationTime":-1,"execute_exclusively":true,"retries_after_failure":0,"env":{}},"suite":{"name":"FibonacciSuite","command":"benchmarks/fibonacci.py %(benchmark)s","executor":{"name":"python","executable":"python3","action":"benchmark","runDetails":{"invocations":1,"iterations":1,"minIterationTime":1,"maxInvocationTime":-1,"execute_exclusively":true,"retries_after_failure":0,"env":{}},"variables":{"input_sizes":[""],"cores":[1],"variable_values":[""],"tags":[null]}}},"variables":{"input_sizes":[""],"cores":[1],"variable_values":[""],"tags":[null]}}
+# run_id: 0={"cmdline":"python3 benchmarks/fibonacci.py 30","cores":1,"benchmark_id":0}
+1	1	180.000000	ms	user	30	python	FibonacciSuite		1					0
+1	1	20.000000	ms	sys	30	python	FibonacciSuite		1					0
+1	1	590.000000	ms	total	30	python	FibonacciSuite		1					0
+# benchmark: 1={"name":"25","command":"25","runDetails":{"invocations":1,"iterations":1,"minIterationTime":1,"maxInvocationTime":-1,"execute_exclusively":true,"retries_after_failure":0,"env":{}},"suite":{"name":"FibonacciSuite","command":"benchmarks/fibonacci.py %(benchmark)s","executor":{"name":"python","executable":"python3","action":"benchmark","runDetails":{"invocations":1,"iterations":1,"minIterationTime":1,"maxInvocationTime":-1,"execute_exclusively":true,"retries_after_failure":0,"env":{}},"variables":{"input_sizes":[""],"cores":[1],"variable_values":[""],"tags":[null]}}},"variables":{"input_sizes":[""],"cores":[1],"variable_values":[""],"tags":[null]}}
+# run_id: 1={"cmdline":"python3 benchmarks/fibonacci.py 25","cores":1,"benchmark_id":1}
+1	1	30.000000	ms	user	25	python	FibonacciSuite		1					1
+1	1	0.000000	ms	sys	25	python	FibonacciSuite		1					1
+1	1	50.000000	ms	total	25	python	FibonacciSuite		1					1
+# benchmark: 2={"name":"20","command":"20","runDetails":{"invocations":1,"iterations":1,"minIterationTime":1,"maxInvocationTime":-1,"execute_exclusively":true,"retries_after_failure":0,"env":{}},"suite":{"name":"FibonacciSuite","command":"benchmarks/fibonacci.py %(benchmark)s","executor":{"name":"python","executable":"python3","action":"benchmark","runDetails":{"invocations":1,"iterations":1,"minIterationTime":1,"maxInvocationTime":-1,"execute_exclusively":true,"retries_after_failure":0,"env":{}},"variables":{"input_sizes":[""],"cores":[1],"variable_values":[""],"tags":[null]}}},"variables":{"input_sizes":[""],"cores":[1],"variable_values":[""],"tags":[null]}}
+# run_id: 2={"cmdline":"python3 benchmarks/fibonacci.py 20","cores":1,"benchmark_id":2}
+1	1	20.000000	ms	user	20	python	FibonacciSuite		1					2
+1	1	0.000000	ms	sys	20	python	FibonacciSuite		1					2
+1	1	40.000000	ms	total	20	python	FibonacciSuite		1					2

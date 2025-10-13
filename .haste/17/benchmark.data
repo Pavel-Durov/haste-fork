@@ -1,0 +1,27 @@
+#!/Users/pd/.local/bin/rebench --no-denoise -df benchmark.data rebench.conf
+# Synthetic test data to demonstrate multitime vs mean-of-means
+invocation	iteration	value	unit	criterion	benchmark	executor	suite	extraArgs	cores	inputSize	varValue	tag	machine	runId
+# Invocation 1: 2 iterations (mean = 15)
+1	1	10.0	ms	total	test	exec1	TestSuite	1	1					0
+1	2	20.0	ms	total	test	exec1	TestSuite	1	1					0
+# Invocation 2: 5 iterations (mean = 50)  
+2	1	30.0	ms	total	test	exec1	TestSuite	1	1					0
+2	2	40.0	ms	total	test	exec1	TestSuite	1	1					0
+2	3	50.0	ms	total	test	exec1	TestSuite	1	1					0
+2	4	60.0	ms	total	test	exec1	TestSuite	1	1					0
+2	5	70.0	ms	total	test	exec1	TestSuite	1	1					0
+# Invocation 3: 3 iterations (mean = 100)
+3	1	90.0	ms	total	test	exec1	TestSuite	1	1					0
+3	2	100.0	ms	total	test	exec1	TestSuite	1	1					0
+3	3	110.0	ms	total	test	exec1	TestSuite	1	1					0
+# exec2 with same structure for comparison
+1	1	15.0	ms	total	test	exec2	TestSuite	1	1					0
+1	2	25.0	ms	total	test	exec2	TestSuite	1	1					0
+2	1	35.0	ms	total	test	exec2	TestSuite	1	1					0
+2	2	45.0	ms	total	test	exec2	TestSuite	1	1					0
+2	3	55.0	ms	total	test	exec2	TestSuite	1	1					0
+2	4	65.0	ms	total	test	exec2	TestSuite	1	1					0
+2	5	75.0	ms	total	test	exec2	TestSuite	1	1					0
+3	1	95.0	ms	total	test	exec2	TestSuite	1	1					0
+3	2	105.0	ms	total	test	exec2	TestSuite	1	1					0
+3	3	115.0	ms	total	test	exec2	TestSuite	1	1					0
