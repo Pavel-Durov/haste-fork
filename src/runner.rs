@@ -7,6 +7,32 @@ use std::process::{self, Command, Stdio};
 use std::time::Duration;
 use terminal_size::terminal_size;
 
+/// Number of iterations to pass to harness.lua (always 1, since haste handles
+/// multiple runs via proc_execs).
+const HARNESS_NUM_ITERATIONS: &str = "1";
+
+/// Build the command arguments for lua harness benchmark execution.
+///
+/// Returns a vector of arguments that will be passed to the lua harness.
+/// The format is: [harness, bench_name, num_iterations, inner_iterations, ...extra_args]
+/// where num_iterations is always "1" (haste handles multiple runs via proc_execs)
+/// and inner_iterations is the value of inproc_iters. (https://github.com/ykjit/yk-benchmarks/blob/main/suites/awfy/Lua/harness.lua#L32)
+fn build_benchmark_args(
+    harness: &str,
+    bench_name: &str,
+    inproc_iters: usize,
+    extra_args: &[String],
+) -> Vec<String> {
+    let mut args = vec![
+        harness.to_string(),
+        bench_name.to_string(),
+        HARNESS_NUM_ITERATIONS.to_string(),
+        inproc_iters.to_string(),
+    ];
+    args.extend(extra_args.iter().cloned());
+    args
+}
+
 fn total_pexecs(config: &Config) -> usize {
     let mut total_pexecs = 0;
     for suite in &config.suites {
@@ -172,9 +198,7 @@ fn run_benchmark(
     bench: &Benchmark,
 ) {
     let harness = suite.harness.to_str().unwrap();
-    let inproc_iters = config.inproc_iters.to_string();
-    let mut args = vec![harness, bench_name, &inproc_iters];
-    args.extend(bench.extra_args.iter().map(String::as_str));
+    let args = build_benchmark_args(harness, bench_name, config.inproc_iters, &bench.extra_args);
 
     let mut cmd = Command::new(executor);
     cmd.current_dir(&suite.dir)
@@ -183,7 +207,7 @@ fn run_benchmark(
     for (k, v) in &suite.env {
         cmd.env(k, v);
     }
-    cmd.args(&args);
+    cmd.args(args.iter().map(String::as_str));
 
     let t = std::time::Instant::now();
     // We are careful to use `output()` and not `spawn()` here so as to avoid deadlocks for
@@ -223,4 +247,39 @@ fn run_benchmark(
         .entry(bench_key.to_string())
         .or_default()
         .push(elapsed);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_benchmark_args_basic() {
+        let args = build_benchmark_args("harness.lua", "deltablue", 10, &[]);
+        assert_eq!(args, vec!["harness.lua", "deltablue", "1", "10"]);
+    }
+
+    #[test]
+    fn test_build_benchmark_args_with_extra_args() {
+        let args = build_benchmark_args("harness.lua", "deltablue", 10, &["12000".to_string()]);
+        assert_eq!(args, vec!["harness.lua", "deltablue", "1", "10", "12000"]);
+    }
+
+    #[test]
+    fn test_build_benchmark_args_num_iterations_always_one() {
+        // Verify that num_iterations is always "1" regardless of inproc_iters
+        let args1 = build_benchmark_args("harness.lua", "bench", 1, &[]);
+        let args2 = build_benchmark_args("harness.lua", "bench", 100, &[]);
+        assert_eq!(args1[2], HARNESS_NUM_ITERATIONS.to_string());
+        assert_eq!(args2[2], HARNESS_NUM_ITERATIONS.to_string());
+    }
+    #[test]
+    fn test_build_benchmark_args_argument_order() {
+        let args = build_benchmark_args("harness.lua", "deltablue", 10, &["12000".to_string()]);
+        assert_eq!(args[0], "harness.lua"); // harness path
+        assert_eq!(args[1], "deltablue"); // benchmark name (arg[1] in harness.lua)
+        assert_eq!(args[2], "1"); // num_iterations (arg[2] in harness.lua)
+        assert_eq!(args[3], "10"); // inner_iterations (arg[3] in harness.lua)
+        assert_eq!(args[4], "12000"); // extra_args[0] (arg[4] in harness.lua)
+    }
 }
