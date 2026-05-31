@@ -1,5 +1,6 @@
 //! The haste config file, using serde.
 
+use indexmap::IndexMap;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -13,10 +14,13 @@ pub struct Config {
     pub(crate) inproc_iters: usize,
     /// The binaries to benchmark with.
     ///
-    /// Each entry in the `HashMap` is a name mapping to the path to the binary.
-    pub(crate) executors: HashMap<String, PathBuf>,
+    /// Each entry in the `IndexMap` is a name mapping to the path to the binary. An `IndexMap` is
+    /// used so that executors run in the order they are declared in the config file.
+    pub(crate) executors: IndexMap<String, PathBuf>,
     /// The benchmark suites to use.
-    pub(crate) suites: HashMap<String, Suite>,
+    ///
+    /// An `IndexMap` is used so that suites run in the order they are declared in the config file.
+    pub(crate) suites: IndexMap<String, Suite>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -35,7 +39,10 @@ pub struct Suite {
     #[serde(default)]
     pub(crate) env: HashMap<String, String>,
     /// Benchmarks in this suite.
-    pub(crate) benchmarks: HashMap<String, Benchmark>,
+    ///
+    /// An `IndexMap` is used so that benchmarks run in the order they are declared in the config
+    /// file.
+    pub(crate) benchmarks: IndexMap<String, Benchmark>,
 }
 
 #[derive(Deserialize, Debug)]
