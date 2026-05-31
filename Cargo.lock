@@ -250,6 +250,7 @@ dependencies = [
  "clap",
  "comfy-table",
  "ctrlc",
+ "indexmap",
  "serde",
  "tempfile",
  "terminal_size",
