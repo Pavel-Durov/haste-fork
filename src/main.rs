@@ -556,6 +556,33 @@ mod tests {
     }
 
     #[test]
+    fn test_benchmark_order_preserved() {
+        // Declare benchmarks in a deliberately non-alphabetical order to ensure the order is
+        // preserved from the config file rather than being sorted or hashed into some other order.
+        let config_content = r#"
+        proc_execs = 1
+        inproc_iters = 1
+
+        [executors]
+        test_exec = "/bin/sh"
+
+        [suites.test_suite]
+        dir = "."
+        harness = "test.sh"
+
+        [suites.test_suite.benchmarks.charlie]
+        [suites.test_suite.benchmarks.alpha]
+        [suites.test_suite.benchmarks.bravo]
+        [suites.test_suite.benchmarks.delta]
+        "#;
+
+        let config: crate::config::Config = toml::from_str(config_content).unwrap();
+        let suite = &config.suites["test_suite"];
+        let order: Vec<&str> = suite.benchmarks.keys().map(String::as_str).collect();
+        assert_eq!(order, ["charlie", "alpha", "bravo", "delta"]);
+    }
+
+    #[test]
     fn confidence_level_default() {
         assert_eq!(ConfidenceLevel::default(), ConfidenceLevel::CL99);
     }
