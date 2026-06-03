@@ -11,6 +11,15 @@ use std::{
 mod config;
 mod runner;
 
+/// The order in which benchmarks are executed.
+#[derive(Copy, Clone, Debug, PartialEq, ValueEnum)]
+pub(crate) enum ExecutionOrder {
+    /// Run benchmarks in the order they are declared in the config file.
+    Declaration,
+    /// Run benchmarks in a randomised order.
+    Randomised,
+}
+
 #[derive(Copy, Clone, Debug, Default, PartialEq, ValueEnum)]
 enum ConfidenceLevel {
     #[value(name = "90")]
@@ -267,7 +276,7 @@ impl App {
     /// Run benchmarks and store the results as a new datum.
     ///
     /// If successful, the new datum is printed to stdout.
-    fn cmd_bench(&self, comment: Option<String>) {
+    fn cmd_bench(&self, comment: Option<String>, order: ExecutionOrder) {
         let config_path = self.config_file.display();
         let config_text = fs::read_to_string(&self.config_file).unwrap_or_else(|e| {
             eprintln!("error: failed to read {config_path}: {e}");
@@ -280,7 +289,7 @@ impl App {
                 std::process::exit(1);
             }
         };
-        let results = runner::run(&config);
+        let results = runner::run(&config, order);
         let id = self.store_datum(results, comment.to_owned());
         let comment_s = comment.unwrap_or("".to_owned());
         println!("haste: created datum {id} {comment_s}");
@@ -429,6 +438,9 @@ enum Mode {
         /// Attach a comment to the datum.
         #[clap(short, long, num_args(1))]
         comment: Option<String>,
+        /// Order in which benchmarks are run.
+        #[arg(short, long, value_enum)]
+        order: ExecutionOrder,
     },
     /// Compare two datums.
     #[clap(visible_alias = "d")]
@@ -448,7 +460,7 @@ fn main() {
     let cli = Cli::parse();
     let app = App::new(cli.file);
     match cli.mode {
-        Mode::Bench { comment } => app.cmd_bench(comment),
+        Mode::Bench { comment, order } => app.cmd_bench(comment, order),
         Mode::Diff {
             id1,
             id2,
@@ -460,7 +472,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{App, ConfidenceLevel, DEFAULT_CONFIG_FILE, SummaryStats};
+    use super::{App, ConfidenceLevel, DEFAULT_CONFIG_FILE, ExecutionOrder, SummaryStats};
     use clap::ValueEnum;
     use std::path::PathBuf;
 
@@ -585,6 +597,18 @@ mod tests {
     #[test]
     fn confidence_level_default() {
         assert_eq!(ConfidenceLevel::default(), ConfidenceLevel::CL99);
+    }
+
+    #[test]
+    fn execution_order_from_str() {
+        assert_eq!(
+            ExecutionOrder::from_str("declaration", false).unwrap(),
+            ExecutionOrder::Declaration
+        );
+        assert_eq!(
+            ExecutionOrder::from_str("randomised", false).unwrap(),
+            ExecutionOrder::Randomised
+        );
     }
 
     #[test]

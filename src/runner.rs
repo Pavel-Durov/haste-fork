@@ -1,5 +1,7 @@
 use crate::BenchKey;
+use crate::ExecutionOrder;
 use crate::{ResultFile, config::*};
+use rand::seq::SliceRandom;
 use std::hint::black_box;
 use std::io::{self, Write};
 use std::path::Path;
@@ -49,22 +51,48 @@ fn get_eta(config: &Config, results: &ResultFile, completed_pexecs: usize) -> St
     }
 }
 
-/// Run all benchmarks from the configuration.
-pub(crate) fn run(config: &Config) -> ResultFile {
-    let mut results = ResultFile::default();
-    let mut completed_pexecs = 0;
+/// Build the list of (executor, suite, benchmark) work in the requested order.
+fn plan(config: &Config, order: ExecutionOrder) -> Vec<(&str, &Path, &Suite, &str, &Benchmark)> {
+    let mut work = Vec::new();
     for (executor_name, executor) in &config.executors {
-        for suite in &config.suites {
-            run_suite(
-                &mut results,
-                config,
-                &mut completed_pexecs,
-                executor_name,
-                executor,
-                suite.1,
-            );
+        for suite in config.suites.values() {
+            for (bench_name, bench) in &suite.benchmarks {
+                work.push((
+                    executor_name.as_str(),
+                    executor.as_path(),
+                    suite,
+                    bench_name.as_str(),
+                    bench,
+                ));
+            }
         }
     }
+    match order {
+        ExecutionOrder::Declaration => {}
+        ExecutionOrder::Randomised => work.shuffle(&mut rand::thread_rng()),
+    }
+    work
+}
+
+/// Run all benchmarks from the configuration.
+pub(crate) fn run(config: &Config, order: ExecutionOrder) -> ResultFile {
+    let mut results = ResultFile::default();
+    let mut completed_pexecs = 0;
+    hide_cursor();
+    ctrlc::set_handler(show_cursor).ok();
+    for (executor_name, executor, suite, bench_name, bench) in plan(config, order) {
+        run_pexecs(
+            &mut results,
+            config,
+            &mut completed_pexecs,
+            executor_name,
+            executor,
+            suite,
+            bench_name,
+            bench,
+        );
+    }
+    show_cursor();
     results
 }
 
@@ -100,67 +128,65 @@ fn update_term_line(lhs: &str, rhs: &str) {
     }
 }
 
-/// Run a suite with the specified executor.
-fn run_suite(
+/// Run all process executions for a single benchmark with the specified executor.
+#[allow(clippy::too_many_arguments)]
+fn run_pexecs(
     results: &mut ResultFile,
     config: &Config,
     completed_pexecs: &mut usize,
     executor_name: &str,
     executor: &Path,
     suite: &Suite,
+    bench_name: &str,
+    bench: &Benchmark,
 ) {
-    hide_cursor();
-    ctrlc::set_handler(show_cursor).ok();
-    for (bench_name, bench) in &suite.benchmarks {
-        let key = BenchKey {
-            benchmark: bench_name.into(),
-            executor: executor_name.into(),
-            extra_args: bench.extra_args.clone(),
-        };
+    let key = BenchKey {
+        benchmark: bench_name.into(),
+        executor: executor_name.into(),
+        extra_args: bench.extra_args.clone(),
+    };
+    let progress = get_progress_percentage(config, *completed_pexecs);
+    let eta = get_eta(config, results, *completed_pexecs);
+    update_term_line(
+        &format!(">>> haste: {key} ..."),
+        &format!("{:3.0}% (ETA {eta})", progress.round() as i64),
+    );
+
+    for i in 0..(config.proc_execs) {
+        io::stdout().flush().ok();
+        run_benchmark(
+            results,
+            config,
+            executor_name,
+            executor,
+            suite,
+            bench_name,
+            bench,
+        );
+        *completed_pexecs += 1;
         let progress = get_progress_percentage(config, *completed_pexecs);
         let eta = get_eta(config, results, *completed_pexecs);
-        update_term_line(
-            &format!(">>> haste: {key} ..."),
-            &format!("{:3.0}% (ETA {eta})", progress.round() as i64),
-        );
-
-        for i in 0..(config.proc_execs) {
-            io::stdout().flush().ok();
-            run_benchmark(
-                results,
-                config,
-                executor_name,
-                executor,
-                suite,
-                bench_name,
-                bench,
-            );
-            *completed_pexecs += 1;
-            let progress = get_progress_percentage(config, *completed_pexecs);
-            let eta = get_eta(config, results, *completed_pexecs);
-            let so_far = results
-                .data
-                .get(&key.to_string())
-                .unwrap()
-                .iter()
-                .map(|x| format!("{x:.0}ms"))
-                .collect::<Vec<_>>()
-                .join(" ");
-            let lhs = if i + 1 < config.proc_execs {
-                format!(">>> haste: {key} {so_far} ...")
-            } else {
-                format!(">>> haste: {key} {so_far}")
-            };
-            let rhs = if i + 1 < config.proc_execs {
-                format!("{:3.0}% (ETA {eta})", progress.round() as i64)
-            } else {
-                "".to_owned()
-            };
-            update_term_line(&lhs, &rhs);
-        }
-        println!();
+        let so_far = results
+            .data
+            .get(&key.to_string())
+            .unwrap()
+            .iter()
+            .map(|x| format!("{x:.0}ms"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let lhs = if i + 1 < config.proc_execs {
+            format!(">>> haste: {key} {so_far} ...")
+        } else {
+            format!(">>> haste: {key} {so_far}")
+        };
+        let rhs = if i + 1 < config.proc_execs {
+            format!("{:3.0}% (ETA {eta})", progress.round() as i64)
+        } else {
+            "".to_owned()
+        };
+        update_term_line(&lhs, &rhs);
     }
-    show_cursor();
+    println!();
 }
 
 /// Run an individual benchmark.
@@ -273,4 +299,38 @@ fn run_benchmark(
         .entry(bench_key.to_string())
         .or_default()
         .push(elapsed);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::plan;
+    use crate::ExecutionOrder;
+    use crate::config::Config;
+
+    const CONFIG: &str = r#"
+        proc_execs = 1
+        inproc_iters = 1
+
+        [executors]
+        e1 = "/bin/sh"
+
+        [suites.s]
+        dir = "."
+        harness = "h"
+        [suites.s.benchmarks.b1]
+        [suites.s.benchmarks.b2]
+        [suites.s.benchmarks.b3]
+    "#;
+
+    #[test]
+    fn plan_declaration_matches_config() {
+        let config: Config = toml::from_str(CONFIG).unwrap();
+        assert_eq!(
+            plan(&config, ExecutionOrder::Declaration)
+                .iter()
+                .map(|(_, _, _, b, _)| *b)
+                .collect::<Vec<&str>>(),
+            ["b1", "b2", "b3"]
+        );
+    }
 }

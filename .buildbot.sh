@@ -24,7 +24,7 @@ cargo test --release
 # Some very rudimentary checks.
 cd example
 shellcheck *.sh
-cargo run -- b -c first
-cargo run --release -- b -c second
+cargo run -- b -c first --order declaration
+cargo run --release -- b -c second --order declaration
 cargo run --release -- l
 cargo run --release -- d 0 1
