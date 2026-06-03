@@ -10,7 +10,7 @@ set -eu
 
 usage() {
     printf "usage: inner_harness.sh <benchmark> <inproc-iters> <param>\n\n"
-    printf "available benchmarks: bigloop"
+    printf "available benchmarks: bigloop, bigloop2, bigloop3"
 }
 
 if [ "$#" -ne 3 ]; then
@@ -32,6 +32,11 @@ bigloop() {
     done
     echo $sum
 }
+
+# Extra variants of `bigloop`, included so that the example has multiple benchmarks for
+# demonstrating execution-order options (e.g. `--order randomised`).
+bigloop2() { bigloop "$1"; }
+bigloop3() { bigloop "$1"; }
 
 # Runs the specified benchmark with the requested number of in-process
 # iterations and benchmark parameter.
@@ -57,7 +62,7 @@ run() {
 }
 
 case $bmark in
-    bigloop)
+    bigloop|bigloop2|bigloop3)
         run "$bmark" "$inproc_iters" "$param"
         ;;
     *)

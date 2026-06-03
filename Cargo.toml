@@ -8,6 +8,7 @@ clap = { version = "4.5.40", features = ["derive"] }
 ctrlc = "3.5.1"
 comfy-table = "7.1.4"
 indexmap = { version = "2.7.1", features = ["serde"] }
+rand = "0.8"
 serde = { version = "1.0.219", features = ["derive"] }
 terminal_size = "0.4.3"
 toml = "0.8.23"
