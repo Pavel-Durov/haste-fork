@@ -12,6 +12,7 @@ zsh = "zsh"
 [suites.example]
 dir = "."
 harness = "./outer_harness.sh"
+env = { "EXAMPLE" = "example" }
 
 [suites.example.benchmarks.bigloop]
 extra_args = ["10000"]
