@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::{Cell, CellAlignment, Color, Table};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -50,9 +51,29 @@ impl ConfidenceLevel {
 }
 
 /// The `extra.toml` file for a datum
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct ExtraToml {
     comment: Option<String>,
+    executors: IndexMap<String, PathBuf>,
+    suite_env: IndexMap<String, HashMap<String, String>>,
+}
+
+fn print_extra(id: usize, extra: &ExtraToml) {
+    let no_comment = "(no comment)".to_owned();
+    println!("Datum{id}: {}", extra.comment.clone().unwrap_or(no_comment));
+    for (name, path) in &extra.executors {
+        println!("  executor {name} = {}", path.display());
+    }
+    for (suite, env) in &extra.suite_env {
+        if env.is_empty() {
+            continue;
+        }
+        let mut entries: Vec<(&String, &String)> = env.iter().collect();
+        entries.sort_by(|a, b| a.0.cmp(b.0));
+        for (k, v) in entries {
+            println!("  suite {suite} env {k}={v}");
+        }
+    }
 }
 
 /// The name of the hidden directory we store state inside.
@@ -231,7 +252,13 @@ impl App {
     }
 
     /// Store a new datum and return the ID.
-    fn store_datum(&self, results: ResultFile, comment: Option<String>) -> usize {
+    fn store_datum(
+        &self,
+        results: ResultFile,
+        comment: Option<String>,
+        executors: IndexMap<String, PathBuf>,
+        suite_env: IndexMap<String, HashMap<String, String>>,
+    ) -> usize {
         let id = self.next_id();
         let datum_dir = self.get_datum_dir(id);
         fs::create_dir(&datum_dir).unwrap();
@@ -241,7 +268,12 @@ impl App {
 
         // Write out the extra metadata.
         // FIXME: consider merging this into the main toml file.
-        let extra_data = toml::to_string(&ExtraToml { comment }).unwrap();
+        let extra_data = toml::to_string(&ExtraToml {
+            comment,
+            executors,
+            suite_env,
+        })
+        .unwrap();
         let extra_path = self.get_datum_extra_path(id);
         std::fs::write(extra_path, extra_data).unwrap();
 
@@ -269,7 +301,11 @@ impl App {
         if let Ok(data) = std::fs::read_to_string(path) {
             toml::from_str(&data).unwrap()
         } else {
-            ExtraToml::default()
+            ExtraToml {
+                comment: None,
+                executors: IndexMap::new(),
+                suite_env: IndexMap::new(),
+            }
         }
     }
 
@@ -290,7 +326,17 @@ impl App {
             }
         };
         let results = runner::run(&config, order);
-        let id = self.store_datum(results, comment.to_owned());
+        let suite_env = config
+            .suites
+            .iter()
+            .map(|(name, suite)| (name.clone(), suite.env.clone()))
+            .collect();
+        let id = self.store_datum(
+            results,
+            comment.to_owned(),
+            config.executors.clone(),
+            suite_env,
+        );
         let comment_s = comment.unwrap_or("".to_owned());
         println!("haste: created datum {id} {comment_s}");
     }
@@ -380,17 +426,9 @@ impl App {
             table.add_row(row);
         }
 
-        // If there's any extra metadata, print it.
-        let extra1 = self.load_extra(id1);
-        let extra2 = self.load_extra(id2);
-        if extra1.comment.is_some() || extra2.comment.is_some() {
-            let no_comment = "(no comment)".to_owned();
-            println!(
-                "Datum{id1}: {}",
-                extra1.comment.unwrap_or(no_comment.clone())
-            );
-            println!("Datum{id2}: {}\n", extra2.comment.unwrap_or(no_comment));
-        }
+        print_extra(id1, &self.load_extra(id1));
+        print_extra(id2, &self.load_extra(id2));
+        println!();
 
         println!("confidence level: {}%\n", confidence.as_percent());
         println!("{table}");
@@ -472,7 +510,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{App, ConfidenceLevel, DEFAULT_CONFIG_FILE, ExecutionOrder, SummaryStats};
+    use super::{
+        App, ConfidenceLevel, DEFAULT_CONFIG_FILE, ExecutionOrder, ExtraToml, SummaryStats,
+    };
     use clap::ValueEnum;
     use std::path::PathBuf;
 
@@ -625,5 +665,25 @@ mod tests {
             ConfidenceLevel::from_str("99", false).unwrap(),
             ConfidenceLevel::CL99
         );
+    }
+
+    #[test]
+    fn extra_toml_loads_all_fields() {
+        let extra: ExtraToml = toml::from_str(
+            r#"
+comment = "baseline"
+[executors]
+csom = "/opt/SOM++"
+yksom = "/opt/yksom"
+[suite_env.awfy]
+SOM_LIB = "/opt/Smalltalk"
+"#,
+        )
+        .unwrap();
+        assert_eq!(extra.comment.as_deref(), Some("baseline"));
+        let exec_keys: Vec<&str> = extra.executors.keys().map(String::as_str).collect();
+        assert_eq!(exec_keys, ["csom", "yksom"]);
+        assert_eq!(extra.executors["csom"], PathBuf::from("/opt/SOM++"));
+        assert_eq!(extra.suite_env["awfy"]["SOM_LIB"], "/opt/Smalltalk");
     }
 }
