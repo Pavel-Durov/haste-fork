@@ -13,9 +13,10 @@ mod config;
 mod runner;
 
 /// The order in which benchmarks are executed.
-#[derive(Copy, Clone, Debug, PartialEq, ValueEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, ValueEnum)]
 pub(crate) enum ExecutionOrder {
     /// Run benchmarks in the order they are declared in the config file.
+    #[default]
     Declaration,
     /// Run benchmarks in a randomised order.
     Randomised,
@@ -477,7 +478,7 @@ enum Mode {
         #[clap(short, long, num_args(1))]
         comment: Option<String>,
         /// Order in which benchmarks are run.
-        #[arg(short, long, value_enum)]
+        #[arg(short, long, value_enum, default_value_t = ExecutionOrder::default())]
         order: ExecutionOrder,
     },
     /// Compare two datums.
