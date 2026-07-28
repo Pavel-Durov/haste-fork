@@ -207,6 +207,17 @@ impl ResultFile {
     }
 }
 
+/// Return a copy of `config` restricted to the benchmarks named in the comma-separated `filter`.
+fn filter_benchmarks(mut config: config::Config, filter: &str) -> config::Config {
+    let names: HashSet<&str> = filter.split(',').map(str::trim).collect();
+    for suite in config.suites.values_mut() {
+        suite
+            .benchmarks
+            .retain(|name, _| names.contains(name.as_str()));
+    }
+    config
+}
+
 struct App {
     /// The directory where persistent state is stored.
     state_dir: PathBuf,
@@ -312,7 +323,7 @@ impl App {
     /// Run benchmarks and store the results as a new datum.
     ///
     /// If successful, the new datum is printed to stdout.
-    fn cmd_bench(&self, comment: Option<String>, order: ExecutionOrder) {
+    fn cmd_bench(&self, comment: Option<String>, order: ExecutionOrder, filter: Option<String>) {
         let config_path = self.config_file.display();
         let config_text = fs::read_to_string(&self.config_file).unwrap_or_else(|e| {
             eprintln!("error: failed to read {config_path}: {e}");
@@ -324,6 +335,10 @@ impl App {
                 eprintln!("Unable to parse {config_path}: {e}");
                 std::process::exit(1);
             }
+        };
+        let config = match &filter {
+            Some(filter) => filter_benchmarks(config, filter),
+            None => config,
         };
         let results = runner::run(&config, order);
         let suite_env = config
@@ -479,6 +494,9 @@ enum Mode {
         /// Order in which benchmarks are run.
         #[arg(short, long, value_enum)]
         order: ExecutionOrder,
+        /// Only run benchmarks with these names (comma-separated, e.g. --filter=richards,cd).
+        #[arg(long)]
+        filter: Option<String>,
     },
     /// Compare two datums.
     #[clap(visible_alias = "d")]
@@ -498,7 +516,11 @@ fn main() {
     let cli = Cli::parse();
     let app = App::new(cli.file);
     match cli.mode {
-        Mode::Bench { comment, order } => app.cmd_bench(comment, order),
+        Mode::Bench {
+            comment,
+            order,
+            filter,
+        } => app.cmd_bench(comment, order, filter),
         Mode::Diff {
             id1,
             id2,
@@ -512,9 +534,39 @@ fn main() {
 mod tests {
     use super::{
         App, ConfidenceLevel, DEFAULT_CONFIG_FILE, ExecutionOrder, ExtraToml, SummaryStats,
+        filter_benchmarks,
     };
     use clap::ValueEnum;
     use std::path::PathBuf;
+
+    #[test]
+    fn filter_benchmarks_restricts_named_benchmarks() {
+        let config: crate::config::Config = toml::from_str(
+            r#"
+                proc_execs = 1
+                inproc_iters = 1
+
+                [executors]
+                e1 = "/bin/sh"
+
+                [suites.s]
+                dir = "."
+                harness = "h"
+                [suites.s.benchmarks.b1]
+                [suites.s.benchmarks.b2]
+                [suites.s.benchmarks.b3]
+            "#,
+        )
+        .unwrap();
+        // b4 is unknown and ignored; b2 is omitted from the filter and dropped from the config.
+        let config = filter_benchmarks(config, "b1, b3, b4");
+        let names: Vec<&str> = config.suites["s"]
+            .benchmarks
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(names, ["b1", "b3"]);
+    }
 
     #[test]
     fn cis_overlap() {
